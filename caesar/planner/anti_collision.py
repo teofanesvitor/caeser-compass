@@ -268,7 +268,10 @@ class AntiCollisionChecker:
             if closest is None:
                 raise ValueError(f"Não foi possível avaliar a geometria de {well.name}.")
             # Each sampled arc is within max_chord_error_m of its chord.
-            error_bound = 2.0 * self.config.max_chord_error_m
+            error_bound = self.config.max_chord_error_m * (
+                int(planned_mode == "minimum_curvature")
+                + int(ref_mode == "minimum_curvature")
+            )
             closest.update({
                 "clearance_lower_bound_m": max(0.0, closest["distance_m"] - error_bound),
                 "sampling_error_bound_m": error_bound,
