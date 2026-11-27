@@ -102,20 +102,27 @@ rejeitada sem eliminar as demais ramificações.
 
 A geometria é amostrada ao longo de cada intervalo de survey. Quando INC/AZI
 estão disponíveis em todos os stations, a posição intermediária é integrada
-analiticamente pela curva Minimum Curvature e depois discretizada com passo
-configurável. O código confere se a posição integrada coincide com as
-coordenadas fornecidas no station seguinte, dentro de
-`coordinate_tolerance_m`. Doglegs próximos de 180° são rejeitados por
-ambiguidade geométrica. Se INC/AZI não estiverem disponíveis, o sistema usa
-interpolação linear e identifica explicitamente essa condição no relatório.
+pela curva Minimum Curvature. A discretização é adaptativa: além do limite de
+comprimento `max_step_m` (padrão: 2 m), controla o erro máximo entre arco e
+corda por `max_chord_error_m` (padrão: 0,02 m). O código preserva todos os
+stations originais, inclusive os intermediários, e confere se a posição
+integrada coincide com as coordenadas fornecidas no station seguinte, dentro
+de `coordinate_tolerance_m`. Doglegs próximos de 180° são rejeitados por
+ambiguidade geométrica. Sem INC/AZI, a interpolação linear é identificada no
+relatório.
 
-O relatório contém a menor aproximação global e uma lista ordenada com a
-menor distância, MD planejado e MD de referência para **cada** poço. A
-configuração `max_step_m` controla o refinamento espacial (padrão: 2 m) e
-`coordinate_tolerance_m` controla a consistência entre coordenadas e
-Minimum Curvature (padrão: 1 m). Reduzir o passo melhora a resolução, mas
-aumenta o custo computacional. A discretização é uma aproximação numérica:
-não substitui uma solução contínua certificada nem uma análise ISCWSA.
+A menor distância é calculada entre segmentos 3D finitos, inclusive em casos
+paralelos ou quase paralelos. Para trechos Minimum Curvature, o relatório
+apresenta também um limite conservador do afastamento: a distância amostrada
+menos a soma dos erros máximos de corda dos dois poços. A aprovação usa esse
+limite inferior, não apenas a distância amostrada. Trechos lineares têm erro
+de discretização nulo. O relatório lista a menor aproximação, os MDs
+correspondentes e o resultado para **cada** poço. `coordinate_tolerance_m`
+(padrão: 1 m) controla a consistência entre coordenadas e Minimum Curvature.
+
+O limite conservador reduz o risco de falso aceite por discretização, mas
+continua sendo uma aproximação numérica; não equivale a uma solução contínua
+certificada nem a uma análise ISCWSA.
 
 Exemplo de configuração no JSON:
 
@@ -124,6 +131,7 @@ Exemplo de configuração no JSON:
   "anti_collision": {
     "minimum_clearance_m": 10.0,
     "max_step_m": 2.0,
+    "max_chord_error_m": 0.02,
     "coordinate_tolerance_m": 1.0,
     "coordinate_system": "UTM 24S / SIRGAS2000",
     "vertical_datum": "MSL",
