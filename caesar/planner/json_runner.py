@@ -160,7 +160,7 @@ def main(argv=None):
     result = run_plan(config)
     rendered = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False)
     if args.output:
-        Path(args.output).write_text(rendered + "\\n", encoding="utf-8")
+        Path(args.output).write_text(rendered + "\n", encoding="utf-8")
     else:
         print(rendered)
 
