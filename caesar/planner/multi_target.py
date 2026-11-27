@@ -69,7 +69,7 @@ def _required_alignment(current: Target, following: Target) -> tuple[float, floa
             f"Alvos {current.name} e {following.name} possuem a mesma posição."
         )
     inclination = degrees(atan2(horizontal, delta_tvd))
-    azimuth = degrees(atan2(delta_ew, delta_ns)) % 360.0 if horizontal > 1e-12 else 0.0
+    azimuth = degrees(atan2(delta_ew, delta_ns)) % 360.0 if horizontal > 1e-12 else None
     return inclination, azimuth
 
 
@@ -112,6 +112,10 @@ class MultiTargetPlanner:
         if following is not None:
             required_inc, required_azi = _required_alignment(target, following)
             description = f"alvo {target.name} em direção a {following.name}"
+            if target.inclination is not None and abs(target.inclination - required_inc) > self.alignment_tolerance_deg:
+                raise ValueError(f"INC informada para {target.name} conflita com o alinhamento para {following.name}.")
+            if target.azimuth is not None and required_azi is not None and _angle_difference(target.azimuth, required_azi) > self.alignment_tolerance_deg:
+                raise ValueError(f"AZI informada para {target.name} conflita com o alinhamento para {following.name}.")
         elif target.inclination is not None or target.azimuth is not None:
             if target.inclination is None or target.azimuth is None:
                 raise ValueError(
@@ -125,7 +129,10 @@ class MultiTargetPlanner:
         actual_inc = float(endpoint["inclination"])
         actual_azi = float(endpoint["azimuth"]) % 360.0
         inc_error = abs(actual_inc - required_inc)
-        azi_error = _angle_difference(actual_azi, required_azi)
+        azi_error = (
+            _angle_difference(actual_azi, required_azi)
+            if required_azi is not None else 0.0
+        )
         tolerance = self.alignment_tolerance_deg
         if inc_error > tolerance or azi_error > tolerance:
             raise ValueError(
