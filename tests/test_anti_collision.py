@@ -60,7 +60,7 @@ def test_minimum_curvature_sampling_follows_arc_not_endpoint_chord():
         survey_point(0, 0, 0, 0, 0, 0),
         survey_point(100, 63.6619772368, 0, 63.6619772368, 90, 90),
     ]
-    samples, mode = __import__("caesar.planner.anti_collision", fromlist=["_densify"])._densify(planned, 1.0)
+    samples, mode = __import__("caesar.planner.anti_collision", fromlist=["_densify"])._densify(planned, 1.0, 1.0)
     assert mode == "minimum_curvature"
     assert len(samples) > 90
     # The quarter-dogleg arc must not be represented by a single straight chord.
