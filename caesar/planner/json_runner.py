@@ -1,7 +1,8 @@
-"""JSON interface for automatic multi-target method selection."""
+"""JSON interface for automatic multi-target method and parameter selection."""
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,63 @@ from caesar.planner import (
     hold_solver, optimum_align_solver, slant_solver, nudge_solver,
     dogleg_toolface_solver, dogleg_curve_hold_solver,
 )
+from caesar.planner.candidate_generator import inclusive_values
+
+
+def _is_range(value: Any) -> bool:
+    return isinstance(value, dict) and set(value) == {"min", "max", "step"}
+
+
+def _is_numeric_sweep(value: Any) -> bool:
+    if _is_range(value):
+        return True
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value)
+    )
+
+
+def _sweep_values(value: Any) -> list[Any]:
+    if _is_range(value):
+        return inclusive_values(
+            float(value["min"]), float(value["max"]), float(value["step"])
+        )
+    if isinstance(value, list):
+        if not value:
+            raise ValueError("Uma lista de variação não pode ser vazia.")
+        return list(value)
+    return [value]
+
+
+def _expand_parameters(value: Any, path: str = ""):
+    """Expand numeric lists/ranges recursively, preserving ordinary structures."""
+    if _is_numeric_sweep(value):
+        options = _sweep_values(value)
+        for option in options:
+            label = f"{path}={option:g}" if path and isinstance(option, (int, float)) else (
+                f"{path}={option}" if path else ""
+            )
+            yield option, ([label] if label else [])
+        return
+    if isinstance(value, dict):
+        keys = list(value)
+        expanded = []
+        for key in keys:
+            expanded.append(list(_expand_parameters(value[key], f"{path}.{key}".strip("."))))
+        for combination in itertools.product(*expanded):
+            result = {}
+            labels = []
+            for key, (item, item_labels) in zip(keys, combination):
+                result[key] = item
+                labels.extend(item_labels)
+            yield result, labels
+        return
+    if isinstance(value, list):
+        # Lists of objects/strings are configuration data, not parameter sweeps.
+        yield value, []
+        return
+    yield value, []
 
 
 def _build_solver(name: str, config: dict[str, Any], constraints: PlanningConstraints):
@@ -42,10 +100,7 @@ def _build_solver(name: str, config: dict[str, Any], constraints: PlanningConstr
 
 
 def _method_roles(kind: str, role: str) -> set[str]:
-    """Return the planning stages in which a configured method may be tried."""
     if role == "auto":
-        # Curve-Hold solves a terminal interception and does not impose the
-        # tangent required to continue toward another target.
         return {"terminal"} if kind == "dogleg_curve_hold" else {"intermediate", "terminal"}
     if role == "both":
         return {"intermediate", "terminal"}
@@ -54,21 +109,55 @@ def _method_roles(kind: str, role: str) -> set[str]:
     raise ValueError(f"role inválido: {role!r}; use auto, both, intermediate ou terminal.")
 
 
-def _build_method_pool(methods: dict[str, Any], constraints: PlanningConstraints):
+def _build_method_pool(
+    methods: dict[str, Any],
+    constraints: PlanningConstraints,
+    *,
+    kop_by_method: dict[str, Any] | None = None,
+    max_candidates: int = 250,
+):
     intermediate, terminal = {}, {}
     expanded_names: dict[str, list[str]] = {}
-    for name, config in methods.items():
+    expanded_kops: dict[str, float] = {}
+    kop_by_method = dict(kop_by_method or {})
+    candidate_count = 0
+
+    for base_name, config in methods.items():
         kind = config["type"]
         role = config.get("role", "auto")
-        built = _build_solver(name, config, constraints)
-        names = list(built)
-        expanded_names[name] = names
         roles = _method_roles(kind, role)
-        if "intermediate" in roles:
-            intermediate.update(built)
-        if "terminal" in roles:
-            terminal.update(built)
-    return intermediate, terminal, expanded_names
+        parameter_variants = list(_expand_parameters(config.get("params", {})))
+        kop_options = _sweep_values(kop_by_method[base_name]) if base_name in kop_by_method else [None]
+
+        for params, labels in parameter_variants:
+            variant_name = base_name
+            if labels:
+                variant_name += " [" + ", ".join(labels) + "]"
+            variant_config = {**config, "params": params}
+            built = _build_solver(variant_name, variant_config, constraints)
+
+            for kop in kop_options:
+                kop_suffix = f" [KOP={float(kop):g}]" if kop is not None else ""
+                for built_name, solver in built.items():
+                    candidate_name = built_name + kop_suffix
+                    candidate_count += 1
+                    if candidate_count > max_candidates:
+                        raise ValueError(
+                            f"A busca gerou mais de {max_candidates} candidatos. "
+                            "Reduza os intervalos ou aumente max_method_candidates."
+                        )
+                    if "intermediate" in roles:
+                        intermediate[candidate_name] = solver
+                    if "terminal" in roles:
+                        terminal[candidate_name] = solver
+                    if kop is not None:
+                        expanded_kops[candidate_name] = float(kop)
+                    expanded_names.setdefault(base_name, []).append(candidate_name)
+
+    unknown_kops = set(kop_by_method) - set(methods)
+    if unknown_kops:
+        raise ValueError("KOP informado para método inexistente: " + ", ".join(sorted(unknown_kops)))
+    return intermediate, terminal, expanded_names, expanded_kops
 
 
 def _json_safe(value):
@@ -84,7 +173,6 @@ def _json_safe(value):
 
 
 def run_plan(config: dict[str, Any]) -> dict[str, Any]:
-    """Run a plan; methods are automatically routed to intermediate/terminal legs."""
     required = ("last_data", "targets", "constraints")
     missing = [key for key in required if key not in config]
     if missing:
@@ -100,18 +188,17 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
     if "methods" in config:
         if "solvers" in config or "terminal_solvers" in config:
             raise ValueError("Use 'methods' ou a configuração legada 'solvers'/'terminal_solvers', não ambas.")
-        solvers, terminal, expanded = _build_method_pool(config["methods"], constraints)
-        kop_by_method = dict(config.get("kop_by_method", {}))
-        for base_name, names in expanded.items():
-            if base_name in kop_by_method and len(names) > 1:
-                value = kop_by_method.pop(base_name)
-                for expanded_name in names:
-                    kop_by_method[expanded_name] = value
+        solvers, terminal, expanded, kop_by_method = _build_method_pool(
+            config["methods"],
+            constraints,
+            kop_by_method=config.get("kop_by_method", {}),
+            max_candidates=int(config.get("max_method_candidates", 250)),
+        )
         if not terminal:
             raise ValueError("Nenhum método habilitado para o último alvo. Revise methods[*].role.")
         if len(targets) > 1 and not solvers:
             raise ValueError("Nenhum método habilitado para os alvos intermediários. Revise methods[*].role.")
-        selection_mode = "automatic"
+        selection_mode = "automatic_parameter_sweep"
     else:
         if "solvers" not in config:
             raise ValueError("JSON precisa informar 'methods' (seleção automática) ou 'solvers' (modo legado).")
@@ -141,6 +228,7 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
             "mode": selection_mode,
             "criterion": "menor MD final entre trajetórias completas viáveis",
             "methods": list(best.methods),
+            "candidate_method_count": len(set(solvers) | set(terminal)),
         },
         "summary": {
             "methods": best.methods,
@@ -152,9 +240,7 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Planejador direcional multialvo via arquivo JSON."
-    )
+    parser = argparse.ArgumentParser(description="Planejador direcional multialvo via arquivo JSON.")
     parser.add_argument("input", help="Arquivo JSON de entrada.")
     parser.add_argument("-o", "--output", help="Arquivo JSON de saída; padrão: stdout.")
     args = parser.parse_args(argv)
