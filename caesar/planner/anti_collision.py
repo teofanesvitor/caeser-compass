@@ -72,6 +72,7 @@ class ReferenceWell:
     survey: tuple[Mapping[str, Any], ...]
     coordinate_system: str
     vertical_datum: str
+    uncertainty: Mapping[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ReferenceWell":
@@ -80,6 +81,7 @@ class ReferenceWell:
             survey=tuple(data["survey"]),
             coordinate_system=str(data["coordinate_system"]),
             vertical_datum=str(data["vertical_datum"]),
+            uncertainty=data.get("uncertainty"),
         )
 
     def validate(self) -> None:
@@ -113,6 +115,8 @@ class AntiCollisionChecker:
     def __init__(self, config: AntiCollisionConfig, reference_wells: Iterable[ReferenceWell]):
         self.config = config
         self.reference_wells = tuple(reference_wells)
+        if not self.reference_wells:
+            raise ValueError("Informe pelo menos um poço de referência para ativar a anticolisão.")
         names = [well.name for well in self.reference_wells]
         if len(names) != len(set(names)):
             raise ValueError("Os nomes dos poços de referência devem ser únicos.")
@@ -156,17 +160,23 @@ class AntiCollisionChecker:
                         }
 
         if closest is None:
-            return {
-                "checked": False,
-                "valid": True,
-                "reason": "Nenhum poço de referência informado.",
-                "minimum_clearance_m": self.config.minimum_clearance_m,
-                "uncertainty_evaluated": False,
-            }
+            raise ValueError("Não foi possível avaliar a geometria dos poços.")
 
+        uncertainty_provided = any(
+            well.uncertainty is not None
+            or any("uncertainty" in station or any(
+                key.startswith(("sigma_", "covariance_")) for key in station
+            ) for station in well.survey)
+            for well in self.reference_wells
+        ) or any(
+            "uncertainty" in station or any(
+                key.startswith(("sigma_", "covariance_")) for key in station
+            ) for station in planned
+        )
         closest["checked"] = True
         closest["minimum_clearance_m"] = float(self.config.minimum_clearance_m)
         closest["valid"] = closest["distance_m"] >= self.config.minimum_clearance_m
+        closest["uncertainty_provided"] = uncertainty_provided
         closest["uncertainty_evaluated"] = False
         closest["method"] = "3D piecewise-linear survey clearance"
         if not closest["valid"]:
