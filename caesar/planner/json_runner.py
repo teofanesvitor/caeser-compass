@@ -228,6 +228,8 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
                 minimum_clearance_m=float(anti_collision_config["minimum_clearance_m"]),
                 coordinate_system=str(anti_collision_config["coordinate_system"]),
                 vertical_datum=str(anti_collision_config["vertical_datum"]),
+                max_step_m=float(anti_collision_config.get("max_step_m", 2.0)),
+                coordinate_tolerance_m=float(anti_collision_config.get("coordinate_tolerance_m", 1.0)),
             ),
             reference_wells,
         )
