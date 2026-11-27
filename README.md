@@ -111,13 +111,37 @@ O arquivo de entrada contém:
   calcula a orientação de chegada apontando para o alvo seguinte.
 - `constraints`: limites de DLS, inclinação e tolerância posicional.
 - `methods`: conjunto único de métodos candidatos. O planejador os distribui automaticamente entre trechos intermediários e alvo final. O campo opcional `role` aceita `auto` (padrão), `both`, `intermediate` ou `terminal`.
-- `kop_by_method`: KOP absoluto em MD para os métodos indicados.
+- `kop_by_method`: KOP absoluto em MD para os métodos indicados. Aceita valor único, lista ou intervalo.
+- `max_method_candidates`: limite de segurança para o total de candidatos gerados (padrão: 250).
 
 Tipos de método aceitos no JSON: `optimum_align`, `slant`, `hold`, `nudge`, `dogleg_toolface` e `dogleg_curve_hold`. Os parâmetros de cada método ficam dentro de `params`; consulte o exemplo para a estrutura. Por padrão, `dogleg_curve_hold` é reservado ao alvo final, pois não impõe a tangente necessária para seguir a outro alvo. Os demais métodos são testados nos dois papéis; candidatos incompatíveis são rejeitados pelas verificações geométricas e de restrições. É possível restringir um método com `role`.
 
-No Slant, cada valor de `hold_lengths` é transformado em um candidato
-independente. Assim, o planejador mantém alternativas para comparar o MD
-final da sequência completa, em vez de escolher apenas o melhor Slant local.
+### Busca automática de parâmetros
+
+Além de escolher o método, o JSON pode definir variações numéricas nos parâmetros.
+Use uma lista para valores discretos ou um objeto `{"min": ..., "max": ..., "step": ...}`
+para gerar um intervalo inclusivo. Todos os parâmetros variáveis são combinados
+por produto cartesiano. Exemplo:
+
+```json
+{
+  "dogleg1": {"min": 1.5, "max": 3.0, "step": 0.5},
+  "dogleg2": [2.0, 2.5]
+}
+```
+
+Isso gera seis combinações independentes. A mesma sintaxe pode ser usada em
+parâmetros numéricos de Slant, Nudge, Dogleg Toolface e Curve-Hold. Em Slant,
+cada valor de `hold_lengths` também vira um candidato independente. O
+`kop_by_method` aceita valor único, lista ou intervalo e é aplicado como KOP
+físico externo ao método, mantendo a regra de que KOP não pertence ao Optimum
+Align. Os candidatos de cada trecho são combinados pelo planejador multialvo,
+que seleciona a trajetória completa de menor MD final.
+
+O limite `max_method_candidates` evita explosão combinatória acidental; o
+padrão é 250 e a execução falha explicitamente se a configuração ultrapassá-lo.
+O limite conta variantes de método/parametrização geradas, não apenas os
+candidatos que conseguem atingir o alvo.
 
 O resultado JSON contém a trajetória vencedora em `best.points`, as demais combinações viáveis em `candidates`, os motivos de rejeição em `rejected`, o modo e critério de seleção em `selection` e um resumo com métodos e MD final. A seleção é global: o planejador expande as combinações entre alvos e escolhe a de menor MD final entre as trajetórias completas viáveis. A configuração legada `solvers`/`terminal_solvers` continua aceita, mas `methods` é a interface recomendada. O arquivo de exemplo é ilustrativo e deve
 ser ajustado aos dados e parâmetros reais antes de uso operacional.
