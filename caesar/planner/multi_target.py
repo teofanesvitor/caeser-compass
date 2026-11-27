@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from math import atan2, degrees, hypot, sqrt
 from typing import Callable, Iterable, Mapping, Any
 from .models import PlanningConstraints
+from .kop import prepare_last_data_at_kop
 
 @dataclass(frozen=True)
 class Target:
@@ -14,7 +15,6 @@ class Target:
     inclination: float | None = None
     azimuth: float | None = None
     tolerance: float | None = None
-
     def as_solver_input(self) -> dict[str, Any]:
         result = {"name": self.name, "tvd": self.tvd, "ns": self.ns, "ew": self.ew}
         if self.inclination is not None: result["inclination"] = self.inclination
@@ -27,7 +27,6 @@ class MultiTargetCandidate:
     methods: tuple[str, ...]
     points: list[dict[str, Any]]
     reached_targets: list[str] = field(default_factory=list)
-
     @property
     def final_md(self) -> float:
         return float(self.points[-1]["depth"]) if self.points else float("inf")
@@ -36,8 +35,7 @@ Solver = Callable[..., Iterable[dict[str, Any]]]
 
 def _position_error(point: Mapping[str, Any], target: Target) -> float:
     return max(abs(float(point["verticalDepth"]) - target.tvd),
-               abs(float(point["ns"]) - target.ns),
-               abs(float(point["ew"]) - target.ew))
+               abs(float(point["ns"]) - target.ns), abs(float(point["ew"]) - target.ew))
 
 def _angle_difference(a: float, b: float) -> float:
     return abs((float(a) - float(b) + 180.0) % 360.0 - 180.0)
@@ -76,7 +74,7 @@ def _validate_segment_start(segment_start: Mapping[str, Any], expected: Mapping[
         raise ValueError("descontinuidade de azimute no início do segmento")
 
 class MultiTargetPlanner:
-    """Sequential planner with optional dedicated terminal-method solvers."""
+    """Sequential planner with optional terminal solvers and per-method KOPs."""
     def __init__(self, constraints: PlanningConstraints, alignment_tolerance_deg: float = 0.1):
         if alignment_tolerance_deg < 0: raise ValueError("A tolerância angular não pode ser negativa.")
         self.constraints = constraints
@@ -105,7 +103,9 @@ class MultiTargetPlanner:
 
     def plan(self, last_data: dict[str, Any], targets: Iterable[Target],
              solvers: Mapping[str, Solver], *,
-             terminal_solvers: Mapping[str, Solver] | None = None) -> dict[str, Any]:
+             terminal_solvers: Mapping[str, Solver] | None = None,
+             kop_by_method: Mapping[str, float] | None = None) -> dict[str, Any]:
+        """KOPs are optional absolute MD values, applied per method on the first leg."""
         ordered_targets = tuple(targets)
         if not ordered_targets: raise ValueError("Informe pelo menos um alvo.")
         if not solvers and not terminal_solvers: raise ValueError("Informe pelo menos um método.")
@@ -113,6 +113,10 @@ class MultiTargetPlanner:
             raise ValueError("Informe métodos para os alvos intermediários.")
         if terminal_solvers is not None and not terminal_solvers:
             raise ValueError("terminal_solvers foi informado, mas está vazio.")
+        kop_by_method = dict(kop_by_method or {})
+        unknown = set(kop_by_method) - (set(solvers) | set(terminal_solvers or {}))
+        if unknown:
+            raise ValueError("KOP informado para método inexistente: " + ", ".join(sorted(unknown)))
         branches = [MultiTargetCandidate((), [dict(last_data)])]
         rejected = []
         for index, target in enumerate(ordered_targets):
@@ -124,12 +128,17 @@ class MultiTargetPlanner:
                 start = dict(branch.points[-1])
                 for method, solve in active_solvers.items():
                     try:
-                        segment = [dict(p) for p in solve(last_data=start, target=target.as_solver_input(),
-                                                          alignment_target=alignment_target)]
+                        solver_start, prefix = start, []
+                        if index == 0 and method in kop_by_method:
+                            solver_start = prepare_last_data_at_kop(start, kop_by_method[method])
+                            if float(solver_start["depth"]) > float(start["depth"]) + 1e-8:
+                                prefix = [solver_start]
+                        segment = [dict(p) for p in solve(last_data=solver_start,
+                            target=target.as_solver_input(), alignment_target=alignment_target)]
                         if len(segment) < 2:
                             raise ValueError("método deve retornar ponto inicial e pelo menos um ponto final")
-                        _validate_segment_start(segment[0], start, self.constraints.position_tolerance)
-                        combined = branch.points + segment[1:]
+                        _validate_segment_start(segment[0], solver_start, self.constraints.position_tolerance)
+                        combined = branch.points + prefix + segment[1:]
                         endpoint = segment[-1]
                         tolerance = target.tolerance if target.tolerance is not None else self.constraints.position_tolerance
                         error = _position_error(endpoint, target)
