@@ -107,6 +107,10 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
                 value = kop_by_method.pop(base_name)
                 for expanded_name in names:
                     kop_by_method[expanded_name] = value
+        if not terminal:
+            raise ValueError("Nenhum método habilitado para o último alvo. Revise methods[*].role.")
+        if len(targets) > 1 and not solvers:
+            raise ValueError("Nenhum método habilitado para os alvos intermediários. Revise methods[*].role.")
         selection_mode = "automatic"
     else:
         if "solvers" not in config:
