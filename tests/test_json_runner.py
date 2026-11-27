@@ -69,9 +69,9 @@ def test_method_pool_expands_parameter_ranges_and_external_kop():
     assert len(kops) == 4
     assert set(intermediate) == set(expanded["Optimum Align"]) | {"Hold"}
     assert set(terminal) == set(expanded["Optimum Align"]) | {
-        "Dogleg Curve-Hold [params.dls=2]",
-        "Dogleg Curve-Hold [params.dls=2.5]",
-        "Dogleg Curve-Hold [params.dls=3]",
+        "Dogleg Curve-Hold [dls=2]",
+        "Dogleg Curve-Hold [dls=2.5]",
+        "Dogleg Curve-Hold [dls=3]",
         "Hold",
     }
 
