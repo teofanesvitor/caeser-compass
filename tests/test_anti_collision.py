@@ -107,3 +107,48 @@ def test_planner_keeps_candidate_when_all_clearances_are_satisfied():
     assert result["best"].methods == ("route",)
     assert result["anti_collision"]["distance_m"] == pytest.approx(8.0)
     assert result["anti_collision"]["valid"] is True
+
+
+def test_parallel_overlapping_segments_return_zero_not_endpoint_distance():
+    from caesar.planner.anti_collision import _closest_segments
+    distance, s, t = _closest_segments(
+        (0, 0, 0), (10, 0, 0), (5, 0, 0), (15, 0, 0)
+    )
+    assert distance == pytest.approx(0.0)
+    assert s == pytest.approx(0.5)
+    assert t == pytest.approx(0.0)
+
+
+def test_densify_keeps_each_original_station_boundary():
+    from caesar.planner.anti_collision import _densify
+    survey = [
+        survey_point(0, 0, 0, 0),
+        survey_point(10, 10, 0, 0),
+        survey_point(20, 20, 10, 0),
+    ]
+    samples, mode = _densify(survey, 100.0, 1.0)
+    assert mode == "linear_chord"
+    assert [(md, xyz) for md, xyz in samples if md in (0, 10, 20)] == [
+        (0.0, (0.0, 0.0, 0.0)),
+        (10.0, (10.0, 0.0, 0.0)),
+        (20.0, (20.0, 10.0, 0.0)),
+    ]
+
+
+def test_clearance_uses_conservative_sampling_error_bound():
+    report = checker([reference("A", 5.03)], clearance=5.0).evaluate([
+        survey_point(1000, 1000, 0, 0), survey_point(1100, 1100, 0, 0),
+    ])
+    assert report["distance_m"] == pytest.approx(5.03)
+    assert report["sampling_error_bound_m"] == pytest.approx(0.04)
+    assert report["clearance_lower_bound_m"] == pytest.approx(4.99)
+    assert report["valid"] is False
+
+
+def test_rejects_non_finite_and_invalid_sampling_configuration():
+    with pytest.raises(ValueError, match="max_chord_error_m"):
+        AntiCollisionConfig(5, "UTM", "MSL", max_chord_error_m=0)
+    with pytest.raises(ValueError, match="Coordenadas"):
+        checker([reference("A", 5)]).evaluate([
+            survey_point(0, float("nan"), 0, 0), survey_point(10, 10, 0, 0),
+        ])
