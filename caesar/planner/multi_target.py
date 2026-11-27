@@ -1,12 +1,8 @@
-"""Sequential multi-target trajectory planning.
-
-Each intermediate target is intercepted while the solver receives the
-following target as its alignment reference. All feasible branches are kept
-so a locally short segment cannot discard a globally shorter complete path.
-"""
+"""Sequential multi-target trajectory planning with geometric alignment checks."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import atan2, degrees, hypot, sqrt
 from typing import Callable, Iterable, Mapping, Any
 
 from .models import PlanningConstraints
@@ -57,6 +53,26 @@ def _position_error(point: Mapping[str, Any], target: Target) -> float:
     )
 
 
+def _angle_difference(a: float, b: float) -> float:
+    return abs((float(a) - float(b) + 180.0) % 360.0 - 180.0)
+
+
+def _required_alignment(current: Target, following: Target) -> tuple[float, float]:
+    """Return tangent INC/AZI from current target toward the following target."""
+    delta_tvd = following.tvd - current.tvd
+    delta_ns = following.ns - current.ns
+    delta_ew = following.ew - current.ew
+    horizontal = hypot(delta_ns, delta_ew)
+    distance = sqrt(horizontal**2 + delta_tvd**2)
+    if distance <= 1e-12:
+        raise ValueError(
+            f"Alvos {current.name} e {following.name} possuem a mesma posição."
+        )
+    inclination = degrees(atan2(horizontal, delta_tvd))
+    azimuth = degrees(atan2(delta_ew, delta_ns)) % 360.0 if horizontal > 1e-12 else 0.0
+    return inclination, azimuth
+
+
 def _validate_path(points: list[dict[str, Any]], constraints: PlanningConstraints) -> list[str]:
     reasons: list[str] = []
     for index, point in enumerate(points):
@@ -70,17 +86,53 @@ def _validate_path(points: list[dict[str, Any]], constraints: PlanningConstraint
 
 
 class MultiTargetPlanner:
-    """Plans ordered targets and passes the next target as alignment reference.
+    """Plans ordered targets, requiring each intermediate target to aim at the next.
 
     Solver contract:
         solve(last_data, target, alignment_target) -> ordered trajectory points
 
-    alignment_target is the next target for intermediate targets. For the
-    final target it is None; any final orientation constraint stays in target.
+    alignment_target is the next target for intermediate targets. The solver
+    uses this as the Optimum Align orientation reference. The planner then
+    independently verifies the resulting tangent direction.
     """
 
-    def __init__(self, constraints: PlanningConstraints):
+    def __init__(
+        self,
+        constraints: PlanningConstraints,
+        alignment_tolerance_deg: float = 0.1,
+    ):
+        if alignment_tolerance_deg < 0:
+            raise ValueError("A tolerância angular não pode ser negativa.")
         self.constraints = constraints
+        self.alignment_tolerance_deg = float(alignment_tolerance_deg)
+
+    def _validate_arrival_alignment(
+        self, endpoint: Mapping[str, Any], target: Target, following: Target | None
+    ) -> None:
+        if following is not None:
+            required_inc, required_azi = _required_alignment(target, following)
+            description = f"alvo {target.name} em direção a {following.name}"
+        elif target.inclination is not None or target.azimuth is not None:
+            if target.inclination is None or target.azimuth is None:
+                raise ValueError(
+                    f"O alvo final {target.name} exige INC e AZI informados em conjunto."
+                )
+            required_inc, required_azi = target.inclination, target.azimuth
+            description = f"orientação final do alvo {target.name}"
+        else:
+            return
+
+        actual_inc = float(endpoint["inclination"])
+        actual_azi = float(endpoint["azimuth"]) % 360.0
+        inc_error = abs(actual_inc - required_inc)
+        azi_error = _angle_difference(actual_azi, required_azi)
+        tolerance = self.alignment_tolerance_deg
+        if inc_error > tolerance or azi_error > tolerance:
+            raise ValueError(
+                f"alinhamento incorreto em {description}: "
+                f"INC erro={inc_error:.4g}°, AZI erro={azi_error:.4g}° "
+                f"(tolerância={tolerance:g}°)"
+            )
 
     def plan(
         self,
@@ -98,10 +150,8 @@ class MultiTargetPlanner:
         rejected: list[dict[str, str]] = []
 
         for index, target in enumerate(ordered_targets):
-            alignment_target = (
-                ordered_targets[index + 1].as_solver_input()
-                if index + 1 < len(ordered_targets) else None
-            )
+            following = ordered_targets[index + 1] if index + 1 < len(ordered_targets) else None
+            alignment_target = following.as_solver_input() if following else None
             next_branches: list[MultiTargetCandidate] = []
 
             for branch in branches:
@@ -130,6 +180,7 @@ class MultiTargetPlanner:
                                 f"alvo {target.name} não atingido; erro máximo={error:.6g}"
                             )
 
+                        self._validate_arrival_alignment(endpoint, target, following)
                         violations = _validate_path(combined, self.constraints)
                         if violations:
                             raise ValueError("; ".join(violations))
