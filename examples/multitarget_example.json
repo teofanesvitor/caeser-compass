@@ -1,5 +1,5 @@
 {
-  "description": "Exemplo ilustrativo. Substitua survey, alvos e parâmetros pelos dados reais do poço.",
+  "description": "Exemplo ilustrativo: o planejador seleciona automaticamente os métodos viáveis e compara as trajetórias completas.",
   "last_data": {
     "depth": 1000,
     "inclination": 12,
@@ -32,7 +32,7 @@
     "minimum_extension": 0
   },
   "alignment_tolerance_deg": 0.1,
-  "solvers": {
+  "methods": {
     "Optimum Align": {
       "type": "optimum_align",
       "params": {
@@ -52,19 +52,13 @@
         "values": {
           "kop": 1150
         },
-        "hold_lengths": [
-          50,
-          75,
-          100
-        ]
+        "hold_lengths": [50, 75, 100]
       }
     },
     "Hold": {
       "type": "hold",
       "params": {}
-    }
-  },
-  "terminal_solvers": {
+    },
     "Dogleg Curve-Hold": {
       "type": "dogleg_curve_hold",
       "params": {
