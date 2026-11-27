@@ -65,3 +65,23 @@ def test_dogleg_toolface_builds_expected_vertical_build():
 def test_hold_rejects_non_increasing_md():
     with pytest.raises(ValueError):
         calculate_hold(START, 1000.0)
+
+
+def test_hold_solver_projects_target_onto_current_tangent():
+    from caesar.methods.hold import solve
+
+    target = {"tvd": 1200.0, "ns": 0.0, "ew": 0.0}
+    points = solve(START, target)
+    assert points[-1]["depth"] == pytest.approx(1200.0)
+    assert points[-1]["verticalDepth"] == pytest.approx(target["tvd"])
+
+
+def test_hold_solver_rejects_target_off_tangent_by_projection():
+    from caesar.methods.hold import solve
+
+    target = {"tvd": 1200.0, "ns": 20.0, "ew": 0.0}
+    points = solve(START, target)
+    # The candidate is projected onto the tangent; the planner's positional
+    # evaluator is responsible for rejecting the 20 m cross-track miss.
+    assert points[-1]["ns"] == pytest.approx(0.0)
+    assert points[-1]["verticalDepth"] == pytest.approx(1200.0)
