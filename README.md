@@ -10,6 +10,7 @@ Selecionar a trajetória completa de menor MD final entre as combinações que a
 
 - `caesar/core/trajectory.py`: Minimum Curvature e funções geométricas.
 - `caesar/planner/kop.py`: preparação do estado físico no KOP.
+- `caesar/planner/anti_collision.py`: validação geométrica de afastamento 3D contra múltiplos poços.
 - `caesar/planner/multi_target.py`: planejamento sequencial multialvo e alinhamento geométrico.
 - `caesar/planner/`: geração, validação e seleção de candidatos.
 - `caesar/methods/optimum_align.py`: Optimum Align Curve–Hold–Curve e adaptador multialvo.
@@ -92,7 +93,69 @@ pytest
 
 Azimute em graus: 0° = Norte, sentido horário. Coordenadas: NS positivo para Norte; EW positivo para Leste. MD/TVD/coordenadas em metros; DLS em °/30 m.
 
-A anticolisão ainda não está implementada. A arquitetura de avaliação permite adicionar validadores adicionais posteriormente.
+## Anticolisão
+
+A anticolisão é uma restrição obrigatória para cada candidato quando a configuração
+`anti_collision` é fornecida. O planejador avalia a trajetória acumulada contra
+todos os poços de referência; uma ramificação que viole o afastamento mínimo é
+rejeitada sem eliminar as demais ramificações.
+
+A primeira implementação calcula a menor distância entre segmentos 3D das
+poligonais de survey, retornando o poço de referência, a distância mínima e os
+MDs correspondentes nos dois poços. É uma aproximação geométrica por segmentos
+retos entre stations; ainda não é a integração exata das curvas Minimum
+Curvature entre stations.
+
+Exemplo de configuração no JSON:
+
+```json
+{
+  "anti_collision": {
+    "minimum_clearance_m": 10.0,
+    "coordinate_system": "UTM 24S / SIRGAS2000",
+    "vertical_datum": "MSL",
+    "reference_wells": [
+      {
+        "name": "POCO_EXISTENTE_01",
+        "coordinate_system": "UTM 24S / SIRGAS2000",
+        "vertical_datum": "MSL",
+        "survey": [
+          {"depth": 1000, "verticalDepth": 980, "ns": 120, "ew": 80},
+          {"depth": 1200, "verticalDepth": 1150, "ns": 160, "ew": 110}
+        ]
+      },
+      {
+        "name": "POCO_EXISTENTE_02",
+        "coordinate_system": "UTM 24S / SIRGAS2000",
+        "vertical_datum": "MSL",
+        "survey": [
+          {"depth": 900, "verticalDepth": 880, "ns": -100, "ew": 40},
+          {"depth": 1300, "verticalDepth": 1250, "ns": -60, "ew": 90}
+        ]
+      }
+    ]
+  }
+}
+```
+
+Todos os poços devem usar o mesmo sistema de coordenadas, datum vertical e
+unidades (metros). O planejador exige pelo menos um poço de referência quando
+a anticolisão está ativada. Os surveys devem conter ao menos dois stations,
+com MD estritamente crescente.
+
+Os dados opcionais de incerteza podem ser preservados nos objetos de survey
+(por exemplo, campos `uncertainty`, `sigma_*` ou `covariance_*`) ou no
+objeto do poço. Nesta etapa, esses dados são apenas reconhecidos e preservados:
+**não são propagados nem usados para calcular Separation Factor**. O relatório
+indica explicitamente `uncertainty_evaluated: false`. A implementação ISCWSA,
+elipsoides/covariâncias, propagação de incerteza e critérios SF serão uma etapa
+posterior; não se deve interpretar esta verificação geométrica como avaliação
+completa de risco de colisão.
+
+Não existe um limite universal de afastamento: `minimum_clearance_m` deve ser
+definido conforme o padrão e os requisitos operacionais aplicáveis. A validação
+também exige que o usuário forneça corretamente o sistema de coordenadas e o
+datum do poço planejado e dos poços de referência.
 
 ## Executar por JSON
 
