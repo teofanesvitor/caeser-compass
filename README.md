@@ -93,3 +93,36 @@ pytest
 Azimute em graus: 0° = Norte, sentido horário. Coordenadas: NS positivo para Norte; EW positivo para Leste. MD/TVD/coordenadas em metros; DLS em °/30 m.
 
 A anticolisão ainda não está implementada. A arquitetura de avaliação permite adicionar validadores adicionais posteriormente.
+
+## Executar por JSON
+
+O planejador pode ser executado sem escrever código Python para cada poço. Copie
+`examples/multitarget_example.json`, substitua os dados de exemplo e execute:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m caesar examples/multitarget_example.json -o resultado.json
+```
+
+O arquivo de entrada contém:
+
+- `last_data`: último station do survey, com MD, INC, AZI, TVD, NS e EW.
+- `targets`: lista ordenada de alvos. Para alvos intermediários, o programa
+  calcula a orientação de chegada apontando para o alvo seguinte.
+- `constraints`: limites de DLS, inclinação e tolerância posicional.
+- `solvers`: métodos permitidos nos trechos intermediários.
+- `terminal_solvers`: métodos reservados ao último alvo.
+- `kop_by_method`: KOP absoluto em MD para os métodos indicados.
+
+Tipos de método aceitos no JSON: `optimum_align`, `slant`, `hold`,
+`nudge`, `dogleg_toolface` e `dogleg_curve_hold`. Os parâmetros de cada
+método ficam dentro de `params`; consulte o exemplo para a estrutura.
+
+No Slant, cada valor de `hold_lengths` é transformado em um candidato
+independente. Assim, o planejador mantém alternativas para comparar o MD
+final da sequência completa, em vez de escolher apenas o melhor Slant local.
+
+O resultado JSON contém a trajetória vencedora em `best.points`, as demais
+combinações viáveis em `candidates`, os motivos de rejeição em `rejected`
+e um resumo com métodos e MD final. O arquivo de exemplo é ilustrativo e deve
+ser ajustado aos dados e parâmetros reais antes de uso operacional.
