@@ -109,6 +109,8 @@ class MultiTargetPlanner:
         ordered_targets = tuple(targets)
         if not ordered_targets: raise ValueError("Informe pelo menos um alvo.")
         if not solvers and not terminal_solvers: raise ValueError("Informe pelo menos um método.")
+        if len(ordered_targets) > 1 and not solvers:
+            raise ValueError("Informe métodos para os alvos intermediários.")
         if terminal_solvers is not None and not terminal_solvers:
             raise ValueError("terminal_solvers foi informado, mas está vazio.")
         branches = [MultiTargetCandidate((), [dict(last_data)])]
