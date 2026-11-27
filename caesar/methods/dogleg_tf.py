@@ -32,5 +32,10 @@ def calculate_trajectory(params: dict, progress=None) -> list[dict]:
     return build_segment(last_data, final_md, inc, azi, "Dogleg Toolface")
 
 
-def solve(last_data: dict, target: dict | None = None, **parameters) -> list[dict]:
-    return calculate_trajectory({"last_data": last_data, "values": parameters})
+def solve(last_data: dict, target: dict, alignment_target=None, *,
+          tool_face: float, dls: float, extension: float) -> list[dict]:
+    """Expose Dogleg Toolface through the multi-target solver contract."""
+    return calculate_trajectory({
+        "last_data": last_data,
+        "values": {"tool_face": tool_face, "dls": dls, "extension": extension},
+    })
