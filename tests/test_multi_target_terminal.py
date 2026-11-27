@@ -32,7 +32,7 @@ def test_terminal_solver_is_only_used_on_last_target():
 
     def intermediate(last_data, target, alignment_target):
         assert alignment_target["name"] == "T2"
-        return [last_data, point(1100, 1100, 50, 0, inc=10, azi=20)]
+        return [last_data, point(1100, 1100, 50, 0, inc=26.5650511771, azi=0)]
 
     def terminal(last_data, target, alignment_target):
         calls.append(target["name"])
