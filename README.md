@@ -110,19 +110,14 @@ O arquivo de entrada contém:
 - `targets`: lista ordenada de alvos. Para alvos intermediários, o programa
   calcula a orientação de chegada apontando para o alvo seguinte.
 - `constraints`: limites de DLS, inclinação e tolerância posicional.
-- `solvers`: métodos permitidos nos trechos intermediários.
-- `terminal_solvers`: métodos reservados ao último alvo.
+- `methods`: conjunto único de métodos candidatos. O planejador os distribui automaticamente entre trechos intermediários e alvo final. O campo opcional `role` aceita `auto` (padrão), `both`, `intermediate` ou `terminal`.
 - `kop_by_method`: KOP absoluto em MD para os métodos indicados.
 
-Tipos de método aceitos no JSON: `optimum_align`, `slant`, `hold`,
-`nudge`, `dogleg_toolface` e `dogleg_curve_hold`. Os parâmetros de cada
-método ficam dentro de `params`; consulte o exemplo para a estrutura.
+Tipos de método aceitos no JSON: `optimum_align`, `slant`, `hold`, `nudge`, `dogleg_toolface` e `dogleg_curve_hold`. Os parâmetros de cada método ficam dentro de `params`; consulte o exemplo para a estrutura. Por padrão, `dogleg_curve_hold` é reservado ao alvo final, pois não impõe a tangente necessária para seguir a outro alvo. Os demais métodos são testados nos dois papéis; candidatos incompatíveis são rejeitados pelas verificações geométricas e de restrições. É possível restringir um método com `role`.
 
 No Slant, cada valor de `hold_lengths` é transformado em um candidato
 independente. Assim, o planejador mantém alternativas para comparar o MD
 final da sequência completa, em vez de escolher apenas o melhor Slant local.
 
-O resultado JSON contém a trajetória vencedora em `best.points`, as demais
-combinações viáveis em `candidates`, os motivos de rejeição em `rejected`
-e um resumo com métodos e MD final. O arquivo de exemplo é ilustrativo e deve
+O resultado JSON contém a trajetória vencedora em `best.points`, as demais combinações viáveis em `candidates`, os motivos de rejeição em `rejected`, o modo e critério de seleção em `selection` e um resumo com métodos e MD final. A seleção é global: o planejador expande as combinações entre alvos e escolhe a de menor MD final entre as trajetórias completas viáveis. A configuração legada `solvers`/`terminal_solvers` continua aceita, mas `methods` é a interface recomendada. O arquivo de exemplo é ilustrativo e deve
 ser ajustado aos dados e parâmetros reais antes de uso operacional.
