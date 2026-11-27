@@ -80,6 +80,8 @@ def _build_solver(name: str, config: dict[str, Any], constraints: PlanningConstr
         return {name: optimum_align_solver(**p)}
     if kind == "slant":
         holds = p.pop("hold_lengths")
+        if isinstance(holds, (int, float)):
+            holds = [holds]
         if not holds:
             raise ValueError(f"{name}: informe params.hold_lengths.")
         result = {}
