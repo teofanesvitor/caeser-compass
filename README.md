@@ -100,11 +100,22 @@ A anticolisão é uma restrição obrigatória para cada candidato quando a conf
 todos os poços de referência; uma ramificação que viole o afastamento mínimo é
 rejeitada sem eliminar as demais ramificações.
 
-A primeira implementação calcula a menor distância entre segmentos 3D das
-poligonais de survey, retornando o poço de referência, a distância mínima e os
-MDs correspondentes nos dois poços. É uma aproximação geométrica por segmentos
-retos entre stations; ainda não é a integração exata das curvas Minimum
-Curvature entre stations.
+A geometria é amostrada ao longo de cada intervalo de survey. Quando INC/AZI
+estão disponíveis em todos os stations, a posição intermediária é integrada
+analiticamente pela curva Minimum Curvature e depois discretizada com passo
+configurável. O código confere se a posição integrada coincide com as
+coordenadas fornecidas no station seguinte, dentro de
+`coordinate_tolerance_m`. Doglegs próximos de 180° são rejeitados por
+ambiguidade geométrica. Se INC/AZI não estiverem disponíveis, o sistema usa
+interpolação linear e identifica explicitamente essa condição no relatório.
+
+O relatório contém a menor aproximação global e uma lista ordenada com a
+menor distância, MD planejado e MD de referência para **cada** poço. A
+configuração `max_step_m` controla o refinamento espacial (padrão: 2 m) e
+`coordinate_tolerance_m` controla a consistência entre coordenadas e
+Minimum Curvature (padrão: 1 m). Reduzir o passo melhora a resolução, mas
+aumenta o custo computacional. A discretização é uma aproximação numérica:
+não substitui uma solução contínua certificada nem uma análise ISCWSA.
 
 Exemplo de configuração no JSON:
 
@@ -112,6 +123,8 @@ Exemplo de configuração no JSON:
 {
   "anti_collision": {
     "minimum_clearance_m": 10.0,
+    "max_step_m": 2.0,
+    "coordinate_tolerance_m": 1.0,
     "coordinate_system": "UTM 24S / SIRGAS2000",
     "vertical_datum": "MSL",
     "reference_wells": [
