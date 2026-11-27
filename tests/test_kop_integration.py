@@ -16,7 +16,7 @@ def test_prepare_last_data_at_kop_projects_hold_in_3d():
 def test_kop_is_applied_before_solver_and_included_in_path():
     start = {"depth": 1000.0, "inclination": 0.0, "azimuth": 0.0,
              "verticalDepth": 1000.0, "ns": 0.0, "ew": 0.0, "dls": 0.0}
-    target = Target("T1", 1200.0, 0.0, 0.0, inclination=0.0, azimuth=0.0)
+    target = Target("T1", 1300.0, 0.0, 0.0, inclination=0.0, azimuth=0.0)
     received = {}
     def solver(last_data, target, alignment_target):
         received.update(last_data)
