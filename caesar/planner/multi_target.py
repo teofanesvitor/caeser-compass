@@ -57,7 +57,7 @@ def _angle_difference(a: float, b: float) -> float:
     return abs((float(a) - float(b) + 180.0) % 360.0 - 180.0)
 
 
-def _required_alignment(current: Target, following: Target) -> tuple[float, float]:
+def _required_alignment(current: Target, following: Target) -> tuple[float, float | None]:
     """Return tangent INC/AZI from current target toward the following target."""
     delta_tvd = following.tvd - current.tvd
     delta_ns = following.ns - current.ns
