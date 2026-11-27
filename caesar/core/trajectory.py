@@ -114,3 +114,30 @@ class WellTrajectory:
             "Turn (deg/30m)": self.turn.copy(),
             "Toolface (deg)": self.toolface.copy(),
         }
+
+def spatial_angle(theta1: float, phi1: float, theta2: float, phi2: float) -> float:
+    """Angular separation between two wellbore directions in radians."""
+    value = (
+        np.cos(theta1) * np.cos(theta2)
+        + np.sin(theta1) * np.sin(theta2) * np.cos(phi2 - phi1)
+    )
+    return float(np.arccos(np.clip(value, -1.0, 1.0)))
+
+
+def gamma_factor(length: float, dogleg: float) -> float:
+    """Minimum Curvature gamma factor: half-length multiplied by RF."""
+    if abs(dogleg) < 1e-12:
+        return float(length) / 2.0
+    return float(length) / dogleg * np.tan(dogleg / 2.0)
+
+
+def deg2rad(value: float) -> float:
+    return float(np.radians(value))
+
+
+def rad2deg(value: float) -> float:
+    return float(np.degrees(value))
+
+
+def normalize_angle_rad(value: float) -> float:
+    return float(value % (2.0 * np.pi))
