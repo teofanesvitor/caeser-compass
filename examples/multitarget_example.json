@@ -1,5 +1,5 @@
 {
-  "description": "Exemplo ilustrativo: o planejador seleciona automaticamente os métodos viáveis e compara as trajetórias completas.",
+  "description": "Exemplo de busca automática de métodos e parâmetros; ajustar para os dados reais do poço.",
   "last_data": {
     "depth": 1000,
     "inclination": 12,
@@ -10,20 +10,8 @@
     "displacement": 0
   },
   "targets": [
-    {
-      "name": "ALVO_1",
-      "tvd": 1300,
-      "ns": 180,
-      "ew": 120,
-      "tolerance": 0.01
-    },
-    {
-      "name": "ALVO_2",
-      "tvd": 1900,
-      "ns": 420,
-      "ew": 300,
-      "tolerance": 0.01
-    }
+    {"name": "ALVO_1", "tvd": 1300, "ns": 180, "ew": 120, "tolerance": 0.01},
+    {"name": "ALVO_2", "tvd": 1900, "ns": 420, "ew": 300, "tolerance": 0.01}
   ],
   "constraints": {
     "max_dls": 3,
@@ -32,41 +20,34 @@
     "minimum_extension": 0
   },
   "alignment_tolerance_deg": 0.1,
+  "max_method_candidates": 100,
   "methods": {
     "Optimum Align": {
       "type": "optimum_align",
       "params": {
-        "dogleg1": 2,
-        "dogleg2": 2
+        "dogleg1": {"min": 1.5, "max": 2.5, "step": 0.5},
+        "dogleg2": {"min": 1.5, "max": 2.5, "step": 0.5}
       }
     },
     "Slant": {
       "type": "slant",
       "params": {
         "method_flags": {
-          "kop": true,
-          "dls": false,
-          "inclination": false,
-          "hold_len": false
+          "kop": true, "dls": false, "inclination": false, "hold_len": false
         },
-        "values": {
-          "kop": 1150
-        },
+        "values": {"kop": 1150},
         "hold_lengths": [50, 75, 100]
       }
     },
-    "Hold": {
-      "type": "hold",
-      "params": {}
-    },
+    "Hold": {"type": "hold", "params": {}},
     "Dogleg Curve-Hold": {
       "type": "dogleg_curve_hold",
       "params": {
-        "dls": 2.5
+        "dls": {"min": 2.0, "max": 3.0, "step": 0.5}
       }
     }
   },
   "kop_by_method": {
-    "Optimum Align": 1100
+    "Optimum Align": {"min": 1080, "max": 1120, "step": 20}
   }
 }
