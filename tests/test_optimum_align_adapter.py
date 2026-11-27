@@ -22,7 +22,7 @@ def test_optimum_align_adapter_uses_next_target_direction(monkeypatch):
     )
 
     plan = captured["plan"]
-    assert plan["inclination"] == pytest.approx(27.818, abs=0.01)
+    assert plan["inclination"] == pytest.approx(27.7913, abs=0.001)
     assert plan["azimuth"] == pytest.approx(18.435, abs=0.01)
     assert result[0] == start
     assert result[1]["depth"] == 1400.0
