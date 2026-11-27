@@ -85,3 +85,18 @@ def test_hold_solver_rejects_target_off_tangent_by_projection():
     # evaluator is responsible for rejecting the 20 m cross-track miss.
     assert points[-1]["ns"] == pytest.approx(0.0)
     assert points[-1]["verticalDepth"] == pytest.approx(1200.0)
+
+
+def test_hold_integrates_with_multi_target_planner():
+    from caesar.methods.hold import solve
+    from caesar.planner.models import PlanningConstraints
+    from caesar.planner.multi_target import MultiTargetPlanner, Target
+
+    planner = MultiTargetPlanner(PlanningConstraints(max_dls=1.0))
+    result = planner.plan(
+        START,
+        [Target(name="T1", tvd=1200.0, ns=0.0, ew=0.0)],
+        {"Hold": solve},
+    )
+    assert result["best"].points[-1]["verticalDepth"] == pytest.approx(1200.0)
+    assert result["best"].methods == ("Hold",)
