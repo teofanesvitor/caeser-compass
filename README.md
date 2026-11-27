@@ -25,7 +25,7 @@ Selecionar a trajetória completa de menor MD final entre as combinações que a
 2. O trecho seguinte começa no estado físico completo do trecho anterior.
 3. Ao atingir um alvo intermediário, a tangente (INC/AZI) deve apontar geometricamente para o próximo alvo.
 4. O Optimum Align recebe a posição do alvo atual e a orientação calculada em direção ao próximo alvo.
-5. O KOP não é parâmetro do Optimum Align. O estado deve ser projetado até o KOP antes da chamada, usando `prepare_last_data_at_kop`.
+5. O KOP não é parâmetro do Optimum Align. Configure `kop_by_method={"Optimum Align": kop_md}` em `MultiTargetPlanner.plan`; o planejador projeta o estado até o KOP, registra o Hold na trajetória e chama o solver com o estado preparado. Métodos omitidos iniciam no survey original.
 6. A otimização compara combinações completas de métodos e seleciona o menor MD final.
 7. O último alvo pode usar uma estratégia terminal independente por meio de `terminal_solvers`; o Dogleg Toolface Curve–Hold otimiza a orientação final e o comprimento do Hold a partir do DLS informado.\n8. A continuidade entre segmentos é verificada em MD, TVD, NS, EW, INC e AZI.
 
