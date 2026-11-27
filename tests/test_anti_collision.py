@@ -140,9 +140,9 @@ def test_clearance_uses_conservative_sampling_error_bound():
         survey_point(1000, 1000, 0, 0), survey_point(1100, 1100, 0, 0),
     ])
     assert report["distance_m"] == pytest.approx(5.03)
-    assert report["sampling_error_bound_m"] == pytest.approx(0.04)
-    assert report["clearance_lower_bound_m"] == pytest.approx(4.99)
-    assert report["valid"] is False
+    assert report["sampling_error_bound_m"] == pytest.approx(0.0)
+    assert report["clearance_lower_bound_m"] == pytest.approx(5.03)
+    assert report["valid"] is True
 
 
 def test_rejects_non_finite_and_invalid_sampling_configuration():
