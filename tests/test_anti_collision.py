@@ -86,7 +86,7 @@ def test_planner_rejects_collision_and_preserves_reason():
         end.update({"inclination": 0.0, "azimuth": 0.0, "dls": 0.0})
         return [last_data, end]
 
-    with pytest.raises(ValueError, match="afastamento de 4.000 m"):
+    with pytest.raises(ValueError, match="distância amostrada=4.000 m"):
         planner.plan(start, [target], {"shortest": solver},
                      anti_collision_checker=checker([reference("WELL-A", 4.0)]))
 
