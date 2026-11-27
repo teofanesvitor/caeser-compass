@@ -21,7 +21,12 @@ def calculate_trajectory(params: dict, progress=None) -> list[dict]:
                          constraints["final_azi"], "Nudge MdIncAzi")
 
 
-def solve(last_data: dict, target: dict | None = None, **parameters) -> list[dict]:
-    method = parameters.pop("method", "MdIncAzi")
-    return calculate_trajectory({"last_data": last_data, "method": method,
-                                  "constraints": parameters})
+def solve(last_data: dict, target: dict, alignment_target=None, *,
+          final_md: float, final_inc: float, final_azi: float) -> list[dict]:
+    """Expose MdIncAzi through the multi-target solver contract."""
+    return calculate_trajectory({
+        "last_data": last_data, "method": "MdIncAzi",
+        "constraints": {
+            "final_md": final_md, "final_inc": final_inc, "final_azi": final_azi,
+        },
+    })
