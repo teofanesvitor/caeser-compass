@@ -68,7 +68,7 @@ def test_minimum_curvature_sampling_follows_arc_not_endpoint_chord():
 
 
 def test_rejects_partial_or_mixed_directional_data():
-    with pytest.raises(ValueError, match="INC e AZI"):
+    with pytest.raises(ValueError, match="INC/AZI"):
         checker([ReferenceWell("BAD", (
             survey_point(0, 0, 0, 0, 0, None),
             survey_point(10, 10, 0, 0),
