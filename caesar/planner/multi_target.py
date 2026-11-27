@@ -27,6 +27,7 @@ class MultiTargetCandidate:
     methods: tuple[str, ...]
     points: list[dict[str, Any]]
     reached_targets: list[str] = field(default_factory=list)
+    anti_collision: dict[str, Any] | None = None
     @property
     def final_md(self) -> float:
         return float(self.points[-1]["depth"]) if self.points else float("inf")
@@ -104,7 +105,8 @@ class MultiTargetPlanner:
     def plan(self, last_data: dict[str, Any], targets: Iterable[Target],
              solvers: Mapping[str, Solver], *,
              terminal_solvers: Mapping[str, Solver] | None = None,
-             kop_by_method: Mapping[str, float] | None = None) -> dict[str, Any]:
+             kop_by_method: Mapping[str, float] | None = None,
+             anti_collision_checker=None) -> dict[str, Any]:
         """KOPs are optional absolute MD values, applied per method on the first leg."""
         ordered_targets = tuple(targets)
         if not ordered_targets: raise ValueError("Informe pelo menos um alvo.")
@@ -147,8 +149,15 @@ class MultiTargetPlanner:
                         self._validate_arrival_alignment(endpoint, target, following)
                         violations = _validate_path(combined, self.constraints)
                         if violations: raise ValueError("; ".join(violations))
+                        collision_report = (
+                            anti_collision_checker.evaluate(combined)
+                            if anti_collision_checker is not None else branch.anti_collision
+                        )
+                        if collision_report is not None and not collision_report["valid"]:
+                            raise ValueError(collision_report["reason"])
                         next_branches.append(MultiTargetCandidate(
-                            branch.methods+(method,), combined, branch.reached_targets+[target.name]))
+                            branch.methods+(method,), combined,
+                            branch.reached_targets+[target.name], collision_report))
                     except (KeyError, TypeError, ValueError, RuntimeError, ArithmeticError) as exc:
                         rejected.append({"target": target.name, "method": method, "reason": str(exc)})
             if not next_branches:
@@ -156,4 +165,5 @@ class MultiTargetPlanner:
             branches = next_branches
         best = min(branches, key=lambda candidate: candidate.final_md)
         return {"best": best, "candidates": branches, "rejected": rejected,
+                "anti_collision": best.anti_collision,
                 "target_order": [target.name for target in ordered_targets]}
