@@ -51,7 +51,7 @@ def _survey_mode(survey) -> str:
     return "minimum_curvature" if all(flags) else "linear_chord"
 
 
-def _densify(survey, max_step_m: float):
+def _densify(survey, max_step_m: float, coordinate_tolerance_m: float):
     """Sample survey segments; use analytic MC arc integration when INC/AZI exist."""
     mode = _survey_mode(survey)
     result = []
@@ -67,6 +67,8 @@ def _densify(survey, max_step_m: float):
             u0, u1 = _direction(p0), _direction(p1)
             dot = max(-1.0, min(1.0, sum(a*b for a, b in zip(u0, u1))))
             beta = __import__("math").acos(dot)
+            if pi - beta < 1e-7:
+                raise ValueError("Dogleg próximo de 180°: arco Minimum Curvature é geometricamente ambíguo.")
         for k in range(steps):
             f = k / steps
             if index and k == 0:
@@ -83,6 +85,24 @@ def _densify(survey, max_step_m: float):
             else:
                 pos = tuple(xyz0[d] + f*(xyz1[d]-xyz0[d]) for d in range(3))
             result.append((md0 + f*length, pos))
+    if mode == "minimum_curvature":
+        for index in range(len(survey) - 1):
+            p0, p1 = survey[index], survey[index + 1]
+            xyz0, xyz1 = _xyz(p0), _xyz(p1)
+            length = _md(p1) - _md(p0)
+            u0, u1 = _direction(p0), _direction(p1)
+            beta = __import__("math").acos(max(-1.0, min(1.0, sum(x*y for x, y in zip(u0, u1)))))
+            if beta < 1e-8:
+                predicted = tuple(xyz0[d] + length*u0[d] for d in range(3))
+            else:
+                factor = (1.0-cos(beta))/(beta*sin(beta))
+                predicted = tuple(xyz0[d] + length*factor*(u0[d]+u1[d]) for d in range(3))
+            residual = sqrt(sum((predicted[d]-xyz1[d])**2 for d in range(3)))
+            if residual > coordinate_tolerance_m:
+                raise ValueError(
+                    f"Coordenadas do station MD={_md(p1):g} m incompatíveis com "
+                    f"INC/AZI pela Minimum Curvature (resíduo={residual:.3f} m)."
+                )
     result.append((_md(survey[-1]), _xyz(survey[-1])))
     return result, mode
 
@@ -154,12 +174,15 @@ class AntiCollisionConfig:
     coordinate_system: str
     vertical_datum: str
     max_step_m: float = 2.0
+    coordinate_tolerance_m: float = 1.0
 
     def __post_init__(self):
         if not isfinite(float(self.minimum_clearance_m)) or self.minimum_clearance_m < 0:
             raise ValueError("minimum_clearance_m deve ser finito e não negativo.")
         if not isfinite(float(self.max_step_m)) or self.max_step_m <= 0:
             raise ValueError("max_step_m deve ser finito e maior que zero.")
+        if not isfinite(float(self.coordinate_tolerance_m)) or self.coordinate_tolerance_m < 0:
+            raise ValueError("coordinate_tolerance_m deve ser finito e não negativo.")
         if not self.coordinate_system or not self.vertical_datum:
             raise ValueError("Informe coordinate_system e vertical_datum.")
 
@@ -191,10 +214,10 @@ class AntiCollisionChecker:
             raise ValueError("MD da trajetória planejada deve ser estritamente crescente.")
         for point in planned:
             _xyz(point)
-        planned_samples, planned_mode = _densify(planned, self.config.max_step_m)
+        planned_samples, planned_mode = _densify(planned, self.config.max_step_m, self.config.coordinate_tolerance_m)
         per_well = []
         for well in self.reference_wells:
-            ref_samples, ref_mode = _densify(well.survey, self.config.max_step_m)
+            ref_samples, ref_mode = _densify(well.survey, self.config.max_step_m, self.config.coordinate_tolerance_m)
             closest = None
             for i in range(len(planned_samples)-1):
                 md_a, xyz_a = planned_samples[i]
