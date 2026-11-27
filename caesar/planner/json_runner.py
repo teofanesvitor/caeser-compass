@@ -230,6 +230,7 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
                 vertical_datum=str(anti_collision_config["vertical_datum"]),
                 max_step_m=float(anti_collision_config.get("max_step_m", 2.0)),
                 coordinate_tolerance_m=float(anti_collision_config.get("coordinate_tolerance_m", 1.0)),
+                max_chord_error_m=float(anti_collision_config.get("max_chord_error_m", 0.02)),
             ),
             reference_wells,
         )
