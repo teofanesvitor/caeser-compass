@@ -12,6 +12,9 @@ from caesar.planner import (
     hold_solver, optimum_align_solver, slant_solver, nudge_solver,
     dogleg_toolface_solver, dogleg_curve_hold_solver,
 )
+from caesar.planner.anti_collision import (
+    AntiCollisionChecker, AntiCollisionConfig, ReferenceWell,
+)
 from caesar.planner.candidate_generator import inclusive_values
 
 
@@ -213,12 +216,29 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
         kop_by_method = dict(config.get("kop_by_method", {}))
         selection_mode = "manual_pool"
 
+    anti_collision_checker = None
+    anti_collision_config = config.get("anti_collision")
+    if anti_collision_config is not None:
+        reference_wells = [
+            ReferenceWell.from_dict(item)
+            for item in anti_collision_config.get("reference_wells", [])
+        ]
+        anti_collision_checker = AntiCollisionChecker(
+            AntiCollisionConfig(
+                minimum_clearance_m=float(anti_collision_config["minimum_clearance_m"]),
+                coordinate_system=str(anti_collision_config["coordinate_system"]),
+                vertical_datum=str(anti_collision_config["vertical_datum"]),
+            ),
+            reference_wells,
+        )
+
     result = planner.plan(
         last_data=config["last_data"],
         targets=targets,
         solvers=solvers,
         terminal_solvers=terminal or None,
         kop_by_method=kop_by_method,
+        anti_collision_checker=anti_collision_checker,
     )
     best = result["best"]
     return _json_safe({
@@ -226,6 +246,7 @@ def run_plan(config: dict[str, Any]) -> dict[str, Any]:
         "candidates": result["candidates"],
         "rejected": result["rejected"],
         "target_order": result["target_order"],
+        "anti_collision": result.get("anti_collision"),
         "selection": {
             "mode": selection_mode,
             "criterion": "menor MD final entre trajetórias completas viáveis",
