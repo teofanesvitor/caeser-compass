@@ -484,7 +484,16 @@ def solve_optimum_align(
         if horizontal < 1e-12 and abs(delta_tvd) < 1e-12:
             raise ValueError("O alvo seguinte coincide com o alvo atual.")
         inclination = rad2deg(np.arctan2(horizontal, delta_tvd))
-        azimuth = normalize_angle_deg(rad2deg(np.arctan2(delta_ew, delta_ns)))
+        azimuth = (
+            normalize_angle_deg(rad2deg(np.arctan2(delta_ew, delta_ns)))
+            if horizontal > 1e-12 else float(target.get("azimuth", last_data["azimuth"]))
+        )
+        if target.get("inclination") is not None and abs(float(target["inclination"]) - inclination) > 0.1:
+            raise ValueError("INC informada conflita com o alinhamento para o próximo alvo.")
+        if target.get("azimuth") is not None and horizontal > 1e-12:
+            azi_error = abs((float(target["azimuth"]) - azimuth + 180.0) % 360.0 - 180.0)
+            if azi_error > 0.1:
+                raise ValueError("AZI informada conflita com o alinhamento para o próximo alvo.")
     else:
         if target.get("inclination") is None or target.get("azimuth") is None:
             raise ValueError(
