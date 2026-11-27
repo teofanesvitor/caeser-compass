@@ -14,6 +14,9 @@ Selecionar a trajetória completa de menor MD final entre as combinações que a
 - `caesar/planner/`: geração, validação e seleção de candidatos.
 - `caesar/methods/optimum_align.py`: Optimum Align Curve–Hold–Curve e adaptador multialvo.
 - `caesar/methods/slant.py`: Slant e busca do comprimento do primeiro Hold.
+- `caesar/methods/hold.py`: trecho Hold com orientação constante.
+- `caesar/methods/nudge.py`: adaptador Nudge para `MdIncAzi`.
+- `caesar/methods/dogleg_tf.py`: Dogleg Toolface e construção do trecho.
 - `tests/`: testes automatizados.
 
 ## Regras do planejamento multialvo
@@ -31,6 +34,12 @@ A tolerância angular de alinhamento padrão é 0,1°. Pode ser ajustada no `Mul
 ## Slant
 
 O Slant original exige exatamente dois parâmetros conhecidos entre KOP, DLS, INC e HOLD_LEN. A busca de Hold fixa HOLD_LEN em cada candidato e exige mais um parâmetro conhecido. Cada resultado é avaliado pelas restrições do projeto.
+
+## Métodos portados e pontos de substituição
+
+Os métodos Hold, Nudge (`MdIncAzi`) e Dogleg Toolface usam a mesma interface de pontos e o motor Minimum Curvature do pacote. O Nudge está deliberadamente limitado ao modo `MdIncAzi`; os demais modos ainda serão portados. Os módulos de método ficam isolados para permitir substituir as rotinas de cálculo sem alterar o planejador multialvo.
+
+Os adaptadores de trecho retornam `[ponto_inicial, ponto_final]`, permitindo encadeamento sem perda do estado físico. O planejador multialvo recebe os solvers pelo contrato `solve(last_data, target, alignment_target)`; métodos que exigem parâmetros específicos devem ser envolvidos por uma função adaptadora.
 
 ## Instalação
 
