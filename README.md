@@ -16,7 +16,7 @@ Selecionar a trajetória completa de menor MD final entre as combinações que a
 - `caesar/methods/slant.py`: Slant e busca do comprimento do primeiro Hold.
 - `caesar/methods/hold.py`: trecho Hold com orientação constante.
 - `caesar/methods/nudge.py`: adaptador Nudge para `MdIncAzi`.
-- `caesar/methods/dogleg_tf.py`: Dogleg Toolface e construção do trecho.
+- `caesar/methods/dogleg_tf.py`: Dogleg Toolface explícito e solver Curve–Hold para interceptação de um alvo usando DLS como parâmetro principal.
 - `tests/`: testes automatizados.
 
 ## Regras do planejamento multialvo
@@ -27,7 +27,7 @@ Selecionar a trajetória completa de menor MD final entre as combinações que a
 4. O Optimum Align recebe a posição do alvo atual e a orientação calculada em direção ao próximo alvo.
 5. O KOP não é parâmetro do Optimum Align. O estado deve ser projetado até o KOP antes da chamada, usando `prepare_last_data_at_kop`.
 6. A otimização compara combinações completas de métodos e seleciona o menor MD final.
-7. O último alvo exige INC/AZI explícitos quando usado pelo adaptador Optimum Align.
+7. O último alvo pode usar uma estratégia terminal independente por meio de `terminal_solvers`; o Dogleg Toolface Curve–Hold otimiza a orientação final e o comprimento do Hold a partir do DLS informado.\n8. A continuidade entre segmentos é verificada em MD, TVD, NS, EW, INC e AZI.
 
 A tolerância angular de alinhamento padrão é 0,1°. Pode ser ajustada no `MultiTargetPlanner`. Restrições de DLS e inclinação são avaliadas sobre a trajetória acumulada.
 
@@ -37,7 +37,7 @@ O Slant original exige exatamente dois parâmetros conhecidos entre KOP, DLS, IN
 
 ## Métodos portados e pontos de substituição
 
-Os métodos Hold, Nudge (`MdIncAzi`) e Dogleg Toolface usam a mesma interface de pontos e o motor Minimum Curvature do pacote. O Nudge está deliberadamente limitado ao modo `MdIncAzi`; os demais modos ainda serão portados. Os módulos de método ficam isolados para permitir substituir as rotinas de cálculo sem alterar o planejador multialvo.
+Os métodos Hold, Nudge (`MdIncAzi`) e Dogleg Toolface usam a mesma interface de pontos e o motor Minimum Curvature do pacote. O Dogleg Toolface possui também `solve_curve_hold(last_data, target, dls=...)`, que procura uma curva de DLS constante seguida de Hold até um único alvo. No multialvo, passe esse método em `terminal_solvers` para reservá-lo ao último alvo. O Nudge está deliberadamente limitado ao modo `MdIncAzi`; os demais modos ainda serão portados. Os módulos de método ficam isolados para permitir substituir as rotinas de cálculo sem alterar o planejador multialvo.
 
 Os adaptadores de trecho retornam `[ponto_inicial, ponto_final]`, permitindo encadeamento sem perda do estado físico. O planejador multialvo recebe os solvers pelo contrato `solve(last_data, target, alignment_target)`; métodos que exigem parâmetros específicos devem ser envolvidos por uma função adaptadora.
 
