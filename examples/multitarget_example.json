@@ -1,0 +1,78 @@
+{
+  "description": "Exemplo ilustrativo. Substitua survey, alvos e parâmetros pelos dados reais do poço.",
+  "last_data": {
+    "depth": 1000,
+    "inclination": 12,
+    "azimuth": 45,
+    "verticalDepth": 980,
+    "ns": 0,
+    "ew": 0,
+    "displacement": 0
+  },
+  "targets": [
+    {
+      "name": "ALVO_1",
+      "tvd": 1300,
+      "ns": 180,
+      "ew": 120,
+      "tolerance": 0.01
+    },
+    {
+      "name": "ALVO_2",
+      "tvd": 1900,
+      "ns": 420,
+      "ew": 300,
+      "tolerance": 0.01
+    }
+  ],
+  "constraints": {
+    "max_dls": 3,
+    "max_inclination": 90,
+    "position_tolerance": 0.01,
+    "minimum_extension": 0
+  },
+  "alignment_tolerance_deg": 0.1,
+  "solvers": {
+    "Optimum Align": {
+      "type": "optimum_align",
+      "params": {
+        "dogleg1": 2,
+        "dogleg2": 2
+      }
+    },
+    "Slant": {
+      "type": "slant",
+      "params": {
+        "method_flags": {
+          "kop": true,
+          "dls": false,
+          "inclination": false,
+          "hold_len": false
+        },
+        "values": {
+          "kop": 1150
+        },
+        "hold_lengths": [
+          50,
+          75,
+          100
+        ]
+      }
+    },
+    "Hold": {
+      "type": "hold",
+      "params": {}
+    }
+  },
+  "terminal_solvers": {
+    "Dogleg Curve-Hold": {
+      "type": "dogleg_curve_hold",
+      "params": {
+        "dls": 2.5
+      }
+    }
+  },
+  "kop_by_method": {
+    "Optimum Align": 1100
+  }
+}
